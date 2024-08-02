@@ -38,6 +38,9 @@ const unsigned int lookUpLimitOffset = 0x8A0;
 const unsigned int lookDownLimitOffset = 0x8A4;
 const unsigned int lookSmoothingSlowAlphaOffset = 0x8C0;
 const unsigned int lookUpRateCapTargetOffset = 0x8D0;
+const unsigned int extraStaminaOnHitOffset = 0xE40;
+const unsigned int camDodgeOffset = 0xE66;
+const unsigned int staminaRegenOffset = 0xE69;
 const unsigned int parryOffset = 0x10CA;
 struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn, AActor
 {
@@ -62,8 +65,22 @@ struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn
 	float lookUpRateCap;
 	float lookUpRateCapTarget;
 
-	char pad6[parryOffset - lookUpRateCapTargetOffset - sizeof(lookUpRateCapTarget)];
+	char pad6[extraStaminaOnHitOffset - lookUpRateCapTargetOffset - sizeof(lookUpRateCapTarget)];
+	char extraStaminaOnHit;
+
+	char pad7[camDodgeOffset - extraStaminaOnHitOffset - sizeof(extraStaminaOnHit)];
+	bool canDodge;
+
+	char pad8[staminaRegenOffset - camDodgeOffset - sizeof(canDodge)];
+	char staminaRegen;
+
+	char pad9[parryOffset - staminaRegenOffset - sizeof(staminaRegen)];
 	char parry;
+};
+
+struct FRotator 
+{
+	float pitch, yaw, roll;
 };
 
 typedef AMordhauGameState* (__fastcall* GetGameStateType)(UWorld* uWorld); // UWorld::GetGameState
@@ -74,3 +91,6 @@ GetVelocityType GetVelocity;
 
 typedef Vector3* (__fastcall* GetPawnViewLocationType)(AMordhauCharacter* uPawn, Vector3* result); // UPawn::GetPawnViewLocation
 GetPawnViewLocationType GetPawnViewLocation;
+
+typedef char (__fastcall* TeleportToType)(AMordhauCharacter* aActor, Vector3* destination, FRotator* rotation, bool isATest, bool noCheck); // AActor::TeleportTo
+TeleportToType TeleportTo;

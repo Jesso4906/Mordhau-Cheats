@@ -5,8 +5,6 @@
 
 bool PatchIsBanned(uintptr_t mordhauBaseAddress);
 
-void UnPatchIsBanned(uintptr_t mordhauBaseAddress);
-
 AMordhauCharacter* GetPlayer(AMordhauGameState* gameState, int index);
 
 AMordhauCharacter* GetClosestPlayerToCrosshair(UWorld* uWorld);

@@ -2,26 +2,36 @@
 
 uintptr_t isBannedAddress = 0;
 
-bool useAimbot = false;
+bool useAimbot = true;
 bool useParrybot = true;
 bool targetSameTeam = true;
 bool increaseLookLimit = false;
+bool enableDodge = true;
+bool increaseStaminaRegen = true;
 bool disableTurnCap = false;
-float sliderValue = 0;
+bool teleportUp = false;
+
+const char* projectiles[] = { "Crossbow", "Long Bow", "Recurve Bow", "Javelin/Short Spear", "Throwing Knife/Axe/Rock"};
+const float projectileSpeeds[] = { 612.5, 600, 550, 300, 277 };
+const int projectileCount = 5;
+int currentProjectile = 4;
+
+const float g = -9.81;
 
 const int aimbotCooldown = 1000;
-int parryDelay = 50;
 const int parryCooldown = 1000000;
 
 DWORD WINAPI Thread(LPVOID param)
 {
 	uintptr_t mordhauBaseAddress = (uintptr_t)GetModuleHandle(L"Mordhau-Win64-Shipping.exe");
 
-	if (mordhauBaseAddress == 0 || !InitFunctions(mordhauBaseAddress) || !PatchIsBanned(mordhauBaseAddress) || !HookPresent())
+	if (mordhauBaseAddress == 0 || !InitFunctions(mordhauBaseAddress) || !HookPresent())
 	{
 		FreeLibraryAndExitThread((HMODULE)param, 0);
 		return 0;
 	}
+
+	PatchIsBanned(mordhauBaseAddress);
 
 	bool enableAimbot = false;
 	AMordhauCharacter* localPlayer = nullptr;
@@ -46,6 +56,14 @@ DWORD WINAPI Thread(LPVOID param)
 		localPlayer = GetPlayer(gameState, 0);
 		if (!IsValidPlayer(localPlayer)) { continue; }
 
+		if (enableDodge) { localPlayer->canDodge = true; }
+		
+		if (increaseStaminaRegen) 
+		{
+			localPlayer->staminaRegen = 100;
+			localPlayer->extraStaminaOnHit = 100;
+		}
+
 		if (increaseLookLimit) 
 		{
 			localPlayer->lookUpLimit = 180;
@@ -61,6 +79,20 @@ DWORD WINAPI Thread(LPVOID param)
 		{
 			localPlayer->turnRateCapTarget = -1;
 			localPlayer->lookUpRateCapTarget = -1;
+		}
+
+		if (teleportUp) 
+		{
+			Vector3 localPlayerPos;
+			GetPawnViewLocation(localPlayer, &localPlayerPos);
+
+			localPlayerPos.z += 250;
+
+			FRotator rotation = {};
+
+			TeleportTo(localPlayer, &localPlayerPos, &rotation, false, false);
+			
+			teleportUp = false;
 		}
 		
 		if(useAimbot && GetAsyncKeyState(0x45) & 1) // E
@@ -103,7 +135,7 @@ DWORD WINAPI Thread(LPVOID param)
 
 			Vector3 diff = localPlayerPos - closestPlayerPos;
 			float distance = sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
-			if (distance == 0 || distance > 350) { continue; }
+			if (distance == 0 || distance > 300) { continue; }
 
 			if (!shouldParry && parrybotTargetPlayer->lookSmoothingSlowAlpha == 0 && parrybotTargetPlayer->parry != 2)
 			{ 
@@ -122,7 +154,7 @@ DWORD WINAPI Thread(LPVOID param)
 				shouldParry = false;
 				parrybotTargetPlayer = nullptr;
 			}
-			else if (parryTimer == parryDelay*2000)
+			else if (parryTimer == 100000)
 			{
 				if (parrybotTargetPlayer->lookSmoothingSlowAlpha == 0 && parrybotTargetPlayer->parry != 2) { SendRightClick(); }
 
@@ -148,8 +180,6 @@ DWORD WINAPI Thread(LPVOID param)
 	if (p_context) { p_context->Release(); p_context = NULL; }
 	if (p_device) { p_device->Release(); p_device = NULL; }
 	SetWindowLongPtr(window, GWLP_WNDPROC, (LONG_PTR)(oWndProc));
-
-	UnPatchIsBanned(mordhauBaseAddress);
 
 	FreeLibraryAndExitThread((HMODULE)param, 0);
 	return 0;
@@ -182,16 +212,19 @@ void Draw() // called in DetourPresent()
 	
 	ImGui::Begin("Jesso Mordhau Cheats", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 	ImGui::SetWindowPos(ImVec2(0, 0));
-	ImGui::SetWindowSize(ImVec2(400, 200), ImGuiCond_Always);
+	ImGui::SetWindowSize(ImVec2(400, 335), ImGuiCond_Always);
 
 	ImGui::Text("Ins - uninject");
 
-	ImGui::Checkbox("Enable aimbot", &useAimbot);
+	ImGui::Checkbox("Enable aimbot (press E to use)", &useAimbot);
+	ImGui::ListBox("Projectile", &currentProjectile, projectiles, projectileCount, projectileCount);
 	ImGui::Checkbox("Enable parrybot", &useParrybot);
-	ImGui::SliderInt("Parry delay", &parryDelay, 1, 100);
 	ImGui::Checkbox("Target players on same team", &targetSameTeam);
 	ImGui::Checkbox("Set look limit to 180 degrees", &increaseLookLimit);
 	ImGui::Checkbox("Disable turn cap", &disableTurnCap);
+	ImGui::Checkbox("Enable dodge", &enableDodge);
+	ImGui::Checkbox("Increase stamina regen", &increaseStaminaRegen);
+	ImGui::Checkbox("Teleport up", &teleportUp);
 
 	ImGui::End();
 }
@@ -206,11 +239,6 @@ bool PatchIsBanned(uintptr_t mordhauBaseAddress)
 	SetBytes((void*)isBannedAddress, (BYTE*)"\xB8\x0\x0\x0\x0\xC3", 6);
 
 	return true;
-}
-
-void UnPatchIsBanned(uintptr_t mordhauBaseAddress)
-{
-	SetBytes((void*)isBannedAddress, (BYTE*)"\x48\x89\x5C\x24\x08\x57", 6);
 }
 
 AMordhauCharacter* GetPlayer(AMordhauGameState* gameState, int index)
@@ -300,19 +328,20 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 
 	Vector3 targetPlayerPos;
 	GetPawnViewLocation(targetPlayer, &targetPlayerPos);
-	targetPlayerPos.z -= 10;
+	targetPlayerPos.z -= 45;
 
 	Vector3 diff = localPlayerPos - targetPlayerPos;
 	float distance = sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
 	if (distance == 0) { return; }
 
-	if (distance > 2000) { targetPlayerPos.z -= 10; }
+	float v = projectileSpeeds[currentProjectile];
+
 	if (distance > 500) 
 	{ 
 		Vector3 velocity;
 		GetVelocity(targetPlayer, &velocity);
 
-		targetPlayerPos = targetPlayerPos + (velocity * 0.2);
+		targetPlayerPos = targetPlayerPos + ((velocity * distance * 0.125) / v);
 	}
 
 	diff = localPlayerPos - targetPlayerPos;
@@ -324,8 +353,13 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 	if (deltaYaw > 180) { deltaYaw = -(360 - deltaYaw); }
 	if (deltaYaw < -180) { deltaYaw = (360 + deltaYaw); }
 
-	float targetPitch = -(asin(diff.z / distance) * rToD) - 6;
-	targetPitch += (distance / 10000);
+	//float targetPitch = -(asin(diff.z / distance) * rToD) - 6;
+	//targetPitch += (distance * projectilePitchFactors[currentProjectile]);
+
+	// https://en.wikipedia.org/wiki/Projectile_motion#Angle_%CE%B8_required_to_hit_coordinate_(x,_y)
+	float targetPitch = -(atan2((v * v - sqrt(v * v * v * v - g * (g * distance * distance + 2 * diff.z * v * v))), g * distance) * rToD) - 6;
+	if (targetPitch < 0) { targetPitch += 180; }
+	else { targetPitch -= 180; }
 
 	localPlayer->pitch = targetPitch;
 	MoveYaw(deltaYaw, -5);
@@ -345,12 +379,16 @@ bool InitFunctions(uintptr_t mordhauBaseAddress)
 	if (getPawnViewLocationAddress == 0) { return false; }
 	GetPawnViewLocation = (GetPawnViewLocationType)getPawnViewLocationAddress;
 
+	uintptr_t teleportToAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x89\x5C\x24\x18\x55\x57\x41\x55\x41\x56\x41\x57\x48\x8D\x6C", 16, 0xCC);
+	if (teleportToAddress == 0) { return false; }
+	TeleportTo = (TeleportToType)teleportToAddress;
+
 	return true;
 }
 
 bool IsValidPtr(void* ptr) 
 { 
-	return (uintptr_t)ptr > 0x10000;
+	return (uintptr_t)ptr > 0x10000 && (uintptr_t)ptr < 0x7FFFFFFFFFFF;
 }
 
 bool IsValidPlayer(AMordhauCharacter* player)
