@@ -30,6 +30,24 @@ struct UWorld
 	AMordhauGameState* gameState;
 };
 
+const unsigned int textOffset = 0x28;
+struct FText 
+{
+	char pad1[textOffset];
+	wchar_t* text;
+};
+
+const unsigned int equipmentNameOffset = 0x550;
+const unsigned int canAttackOffset = 0xCB9;
+struct AMordhauEquipment 
+{
+	char pad1[equipmentNameOffset];
+	FText* equipmentName;
+
+	char pad2[canAttackOffset - equipmentNameOffset - sizeof(equipmentName)];
+	bool canAttack;
+};
+
 const unsigned int isDeadOffset = 0x504;
 const unsigned int pitchOffset = 0x520;
 const unsigned int yawOffset = 0x524;
@@ -42,6 +60,8 @@ const unsigned int extraStaminaOnHitOffset = 0xE40;
 const unsigned int camDodgeOffset = 0xE66;
 const unsigned int staminaRegenOffset = 0xE69;
 const unsigned int parryOffset = 0x10CA;
+const unsigned int rightHandEquipmentOffset = 0x11F8;
+const unsigned int leftHandEquipmentOffset = 0x1200;
 struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn, AActor
 {
 	char pad1[isDeadOffset];
@@ -76,6 +96,10 @@ struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn
 
 	char pad9[parryOffset - staminaRegenOffset - sizeof(staminaRegen)];
 	char parry;
+
+	char pad10[rightHandEquipmentOffset - parryOffset - sizeof(parry)];
+	AMordhauEquipment* rightHandEquipment;
+	AMordhauEquipment* leftHandEquipment;
 };
 
 struct FRotator 

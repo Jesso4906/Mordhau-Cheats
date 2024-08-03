@@ -11,13 +11,9 @@ bool increaseStaminaRegen = true;
 bool disableTurnCap = false;
 bool teleportUp = false;
 
-const char* projectiles[] = { "Crossbow", "Long Bow", "Recurve Bow", "Javelin/Short Spear", "Throwing Knife/Axe/Rock"};
-const float projectileSpeeds[] = { 612.5, 600, 550, 300, 277 };
-const int projectileCount = 5;
-int currentProjectile = 4;
-
 const float g = -9.81;
 
+const int parryDelay = 130000;
 const int aimbotCooldown = 1000;
 const int parryCooldown = 1000000;
 
@@ -95,7 +91,7 @@ DWORD WINAPI Thread(LPVOID param)
 			teleportUp = false;
 		}
 		
-		if(useAimbot && GetAsyncKeyState(0x45) & 1) // E
+		if(useAimbot && GetAsyncKeyState(VK_MBUTTON) & 1)
 		{
 			enableAimbot = !enableAimbot;
 
@@ -141,6 +137,8 @@ DWORD WINAPI Thread(LPVOID param)
 			{ 
 				shouldParry = true;
 				parryTimer = 0;
+
+				if (IsValidPtr(localPlayer->rightHandEquipment)) { localPlayer->rightHandEquipment->canAttack = false; }
 			}
 		}
 
@@ -153,16 +151,20 @@ DWORD WINAPI Thread(LPVOID param)
 				parryTimer = 0;
 				shouldParry = false;
 				parrybotTargetPlayer = nullptr;
+				if (IsValidPtr(localPlayer->rightHandEquipment)) { localPlayer->rightHandEquipment->canAttack = true; }
 			}
-			else if (parryTimer == 100000)
+			else if (parryTimer == parryDelay)
 			{
 				if (parrybotTargetPlayer->lookSmoothingSlowAlpha == 0 && parrybotTargetPlayer->parry != 2) { SendRightClick(); }
+
+				if (IsValidPtr(localPlayer->rightHandEquipment)) { localPlayer->rightHandEquipment->canAttack = true; }
 
 				parryTimer = 0;
 			}
 			else if (parryTimer > parryCooldown) 
 			{
 				shouldParry = false;
+				
 				parrybotTargetPlayer = nullptr;
 			}
 		}
@@ -212,12 +214,11 @@ void Draw() // called in DetourPresent()
 	
 	ImGui::Begin("Jesso Mordhau Cheats", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 	ImGui::SetWindowPos(ImVec2(0, 0));
-	ImGui::SetWindowSize(ImVec2(400, 335), ImGuiCond_Always);
+	ImGui::SetWindowSize(ImVec2(400, 250), ImGuiCond_Always);
 
 	ImGui::Text("Ins - uninject");
 
-	ImGui::Checkbox("Enable aimbot (press E to use)", &useAimbot);
-	ImGui::ListBox("Projectile", &currentProjectile, projectiles, projectileCount, projectileCount);
+	ImGui::Checkbox("Enable aimbot (middle mouse button to use)", &useAimbot);
 	ImGui::Checkbox("Enable parrybot", &useParrybot);
 	ImGui::Checkbox("Target players on same team", &targetSameTeam);
 	ImGui::Checkbox("Set look limit to 180 degrees", &increaseLookLimit);
@@ -321,6 +322,42 @@ void MoveYaw(float deltaYaw, float speed)
 	SendInput(1, &input, sizeof(INPUT));
 }
 
+float GetProjectileVelocity(AMordhauCharacter* localPlayer)
+{
+	if (IsValidPtr(localPlayer->leftHandEquipment))
+	{
+		wchar_t* equipmentName = localPlayer->leftHandEquipment->equipmentName->text;
+
+		if (wcscmp(equipmentName, L"Longbow") == 0) 
+		{
+			return 600;
+		}
+		else if (wcscmp(equipmentName, L"Recurve Bow") == 0)
+		{
+			return 550;
+		}
+	}
+	else if (IsValidPtr(localPlayer->rightHandEquipment))
+	{
+		wchar_t* equipmentName = localPlayer->rightHandEquipment->equipmentName->text;
+		
+		if (wcscmp(equipmentName, L"Crossbow") == 0)
+		{
+			return 625;
+		}
+		else if (wcscmp(equipmentName, L"Short Spear") == 0 || wcscmp(equipmentName, L"Javelin") == 0)
+		{
+			return 300;
+		}
+		else if (wcscmp(equipmentName, L"Throwing Axe") == 0 || wcscmp(equipmentName, L"Throwing Knife") == 0 || wcscmp(equipmentName, L"Rock") == 0)
+		{
+			return 275;
+		}
+	}
+
+	return 600;
+}
+
 void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 {
 	Vector3 localPlayerPos;
@@ -328,13 +365,13 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 
 	Vector3 targetPlayerPos;
 	GetPawnViewLocation(targetPlayer, &targetPlayerPos);
-	targetPlayerPos.z -= 45;
+	targetPlayerPos.z -= 50;
 
 	Vector3 diff = localPlayerPos - targetPlayerPos;
 	float distance = sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
 	if (distance == 0) { return; }
 
-	float v = projectileSpeeds[currentProjectile];
+	float v = GetProjectileVelocity(localPlayer);
 
 	if (distance > 500) 
 	{ 
@@ -352,9 +389,6 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 	float deltaYaw = currentYaw - targetYaw;
 	if (deltaYaw > 180) { deltaYaw = -(360 - deltaYaw); }
 	if (deltaYaw < -180) { deltaYaw = (360 + deltaYaw); }
-
-	//float targetPitch = -(asin(diff.z / distance) * rToD) - 6;
-	//targetPitch += (distance * projectilePitchFactors[currentProjectile]);
 
 	// https://en.wikipedia.org/wiki/Projectile_motion#Angle_%CE%B8_required_to_hit_coordinate_(x,_y)
 	float targetPitch = -(atan2((v * v - sqrt(v * v * v * v - g * (g * distance * distance + 2 * diff.z * v * v))), g * distance) * rToD) - 6;
