@@ -56,10 +56,8 @@ const unsigned int lookUpLimitOffset = 0x8A0;
 const unsigned int lookDownLimitOffset = 0x8A4;
 const unsigned int lookSmoothingSlowAlphaOffset = 0x8C0;
 const unsigned int lookUpRateCapTargetOffset = 0x8D0;
-const unsigned int extraStaminaOnHitOffset = 0xE40;
 const unsigned int camDodgeOffset = 0xE66;
-const unsigned int staminaRegenOffset = 0xE69;
-const unsigned int parryOffset = 0x10CA;
+const unsigned int isBlockingOffset = 0x10CA;
 const unsigned int rightHandEquipmentOffset = 0x11F8;
 const unsigned int leftHandEquipmentOffset = 0x1200;
 struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn, AActor
@@ -85,19 +83,13 @@ struct AMordhauCharacter // inherits from: AAdvancedCharacter, ACharacter, APawn
 	float lookUpRateCap;
 	float lookUpRateCapTarget;
 
-	char pad6[extraStaminaOnHitOffset - lookUpRateCapTargetOffset - sizeof(lookUpRateCapTarget)];
-	char extraStaminaOnHit;
-
-	char pad7[camDodgeOffset - extraStaminaOnHitOffset - sizeof(extraStaminaOnHit)];
+	char pad6[camDodgeOffset - lookUpRateCapTargetOffset - sizeof(lookUpRateCapTarget)];
 	bool canDodge;
 
-	char pad8[staminaRegenOffset - camDodgeOffset - sizeof(canDodge)];
-	char staminaRegen;
+	char pad7[isBlockingOffset - camDodgeOffset - sizeof(canDodge)];
+	char isBlocking;
 
-	char pad9[parryOffset - staminaRegenOffset - sizeof(staminaRegen)];
-	char parry;
-
-	char pad10[rightHandEquipmentOffset - parryOffset - sizeof(parry)];
+	char pad8[rightHandEquipmentOffset - isBlockingOffset - sizeof(isBlocking)];
 	AMordhauEquipment* rightHandEquipment;
 	AMordhauEquipment* leftHandEquipment;
 };
