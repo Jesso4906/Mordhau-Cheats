@@ -107,6 +107,3 @@ GetVelocityType GetVelocity;
 
 typedef Vector3* (__fastcall* GetPawnViewLocationType)(AMordhauCharacter* uPawn, Vector3* result); // UPawn::GetPawnViewLocation
 GetPawnViewLocationType GetPawnViewLocation;
-
-typedef char (__fastcall* TeleportToType)(AMordhauCharacter* aActor, Vector3* destination, FRotator* rotation, bool isATest, bool noCheck); // AActor::TeleportTo
-TeleportToType TeleportTo;
