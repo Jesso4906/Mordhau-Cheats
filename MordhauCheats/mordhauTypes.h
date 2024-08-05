@@ -102,8 +102,11 @@ struct FRotator
 typedef AMordhauGameState* (__fastcall* GetGameStateType)(UWorld* uWorld); // UWorld::GetGameState
 GetGameStateType GetGameState;
 
-typedef Vector3* (__fastcall* GetVelocityType)(AMordhauCharacter* uPawn, Vector3* result); // UPawn::GetVelocity
+typedef Vector3* (__fastcall* GetVelocityType)(AMordhauCharacter* uPawn, Vector3* result); // APawn::GetVelocity
 GetVelocityType GetVelocity;
 
-typedef Vector3* (__fastcall* GetPawnViewLocationType)(AMordhauCharacter* uPawn, Vector3* result); // UPawn::GetPawnViewLocation
+typedef Vector3* (__fastcall* GetPawnViewLocationType)(AMordhauCharacter* uPawn, Vector3* result); // APawn::GetPawnViewLocation
 GetPawnViewLocationType GetPawnViewLocation;
+
+typedef bool (__fastcall* IsPlayerControlledType)(AMordhauCharacter* aPawn); // APawn::IsPlayerControlled
+IsPlayerControlledType IsPlayerControlled;

@@ -11,6 +11,8 @@ void MoveYaw(float deltaYaw, float speed);
 
 AMordhauCharacter* GetPlayer(AMordhauGameState* gameState, int index);
 
+AMordhauCharacter* GetClosestPlayerToLocalplayer(UWorld* uWorld);
+
 AMordhauCharacter* GetClosestPlayerToCrosshair(UWorld* uWorld);
 
 bool InitFunctions(uintptr_t mordhauBaseAddress);

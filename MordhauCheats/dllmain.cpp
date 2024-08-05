@@ -1,7 +1,5 @@
 #include "dllmain.h"
 
-uintptr_t isBannedAddress = 0;
-
 bool useAimbot = true;
 bool useParrybot = true;
 bool targetSameTeam = true;
@@ -104,7 +102,7 @@ DWORD WINAPI Thread(LPVOID param)
 			Vector3 localPlayerPos;
 			GetPawnViewLocation(localPlayer, &localPlayerPos);
 
-			parrybotTargetPlayer = GetPlayer(gameState, 1);
+			parrybotTargetPlayer = GetClosestPlayerToLocalplayer(uWorld);
 			if (!IsValidPlayer(parrybotTargetPlayer)) { continue; }
 			if (!targetSameTeam && parrybotTargetPlayer->team == localPlayer->team) { continue; }
 
@@ -251,7 +249,7 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 	else { targetPitch -= 180; }
 
 	float directPitch = -(asin(diff.z / distance) * rToD) - 6;
-	if (directPitch < -30 || directPitch > 60) { targetPitch = directPitch; }
+	if (directPitch < -45 || directPitch > 60) { targetPitch = directPitch; }
 
 	if (targetPitch > 90 || targetPitch < -90) { return; }
 
@@ -334,6 +332,27 @@ AMordhauCharacter* GetPlayer(AMordhauGameState* gameState, int index)
 	return player;
 }
 
+AMordhauCharacter* GetClosestPlayerToLocalplayer(UWorld* uWorld)
+{
+	AMordhauGameState* gameState = GetGameState(uWorld);
+	if (!IsValidPtr(gameState)) { return nullptr; }
+
+	AMordhauCharacter* localPlayer = GetPlayer(gameState, 0);
+	if (!IsValidPlayer(localPlayer)) { return nullptr; }
+
+	for (int i = 1; i < gameState->playerCount; i++)
+	{
+		AMordhauCharacter* currentPlayer = GetPlayer(gameState, i);
+		if (!IsValidPlayer(currentPlayer)) { break; }
+
+		if (!targetSameTeam && currentPlayer->team == localPlayer->team) { continue; }
+
+		return currentPlayer;
+	}
+
+	return nullptr;
+}
+
 AMordhauCharacter* GetClosestPlayerToCrosshair(UWorld* uWorld)
 {
 	AMordhauGameState* gameState = GetGameState(uWorld);
@@ -342,7 +361,7 @@ AMordhauCharacter* GetClosestPlayerToCrosshair(UWorld* uWorld)
 	AMordhauCharacter* localPlayer = GetPlayer(gameState, 0);
 	if (!IsValidPlayer(localPlayer)) { return nullptr; }
 
-	float minYawDiff = 999999;
+	float minScreenDistance = 999999;
 	AMordhauCharacter* result = nullptr;
 
 	for (int i = 1; i < gameState->playerCount; i++)
@@ -360,18 +379,26 @@ AMordhauCharacter* GetClosestPlayerToCrosshair(UWorld* uWorld)
 
 		Vector3 diff = localPlayerPos - targetPlayerPos;
 
+		float distance = sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
+		if (distance == 0) { return nullptr; }
+
 		float targetYaw = (atan2(diff.y, diff.x) * rToD);
+		float targetPitch = -(asin(diff.z / distance) * rToD);
+
 		float currentYaw = localPlayer->yaw + 180;
+		float currentPitch = localPlayer->pitch;
 
 		float yawDiff = currentYaw - targetYaw;
 		if (yawDiff > 180) { yawDiff = -(360 - yawDiff); }
 		if (yawDiff < -180) { yawDiff = (360 + yawDiff); }
 
-		yawDiff = abs(yawDiff);
+		float pitchDiff = currentPitch - targetPitch;
 
-		if (yawDiff < minYawDiff)
+		float screenDistance = sqrt((yawDiff * yawDiff) + (pitchDiff * pitchDiff));
+
+		if (screenDistance < minScreenDistance)
 		{
-			minYawDiff = yawDiff;
+			minScreenDistance = screenDistance;
 			result = currentPlayer;
 		}
 	}
@@ -393,12 +420,16 @@ bool InitFunctions(uintptr_t mordhauBaseAddress)
 	if (getPawnViewLocationAddress == 0) { return false; }
 	GetPawnViewLocation = (GetPawnViewLocationType)getPawnViewLocationAddress;
 
+	uintptr_t isPlayerControlledType = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x75\x03\xB0\x01\xC3\x32\xC0\xC3", 27, 0xCC);
+	if (isPlayerControlledType == 0) { return false; }
+	IsPlayerControlled = (IsPlayerControlledType)isPlayerControlledType;
+
 	return true;
 }
 
 bool PatchIsBanned(uintptr_t mordhauBaseAddress)
 {
-	isBannedAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x89\x5C\x24\x08\x57\x48\x83\xEC\x20\x83\x7A\x08\x01\x48\x8B\xDA\x48\x8B\xF9\x7E\x3F\x4C\x8B\xC2\x48\x81\xC1\x10\x06\x00\x00", 32, 0xCC);
+	uintptr_t isBannedAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x89\x5C\x24\x08\x57\x48\x83\xEC\x20\x83\x7A\x08\x01\x48\x8B\xDA\x48\x8B\xF9\x7E\x3F\x4C\x8B\xC2\x48\x81\xC1\x10\x06\x00\x00", 32, 0xCC);
 	if (isBannedAddress == 0) { return false; }
 
 	// mov eax, 0
@@ -410,12 +441,12 @@ bool PatchIsBanned(uintptr_t mordhauBaseAddress)
 
 bool IsValidPtr(void* ptr) 
 { 
-	return (uintptr_t)ptr > 0x10000 && (uintptr_t)ptr < 0x7FFFFFFFFFFF;
+	return (uintptr_t)ptr > 0x1000000000 && (uintptr_t)ptr < 0x7FFFFFFFFFFF;
 }
 
 bool IsValidPlayer(AMordhauCharacter* player)
 {
-	return IsValidPtr(player) && !player->isDead;
+	return IsValidPtr(player) && IsPlayerControlled(player) && !player->isDead;
 }
 
 void SendRightClick() 
