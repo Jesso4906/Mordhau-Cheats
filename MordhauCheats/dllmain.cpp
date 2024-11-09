@@ -11,7 +11,8 @@ const float g = -9.81;
 
 const int aimbotCooldown = 1000;
 
-const int parryDelay = 140000;
+const int oneHandParryDelay = 130000;
+const int twoHandParryDelay = 140000;
 const int parryCooldown = 1000000;
 
 const int cheatMenuWidth = 400;
@@ -37,6 +38,7 @@ DWORD WINAPI Thread(LPVOID param)
 	AMordhauCharacter* parrybotTargetPlayer = nullptr;
 	bool shouldParry = false;
 	int parryTimer = 0;
+	int parryDelay = twoHandParryDelay;
 
 	while (!GetAsyncKeyState(VK_INSERT)) // exit when ins key is pressed
 	{
@@ -47,7 +49,11 @@ DWORD WINAPI Thread(LPVOID param)
 		if (!IsValidPtr(uWorld)) { continue; }
 
 		AMordhauGameState* gameState = GetGameState(uWorld);
-		if (!IsValidPtr(gameState)) { continue; }
+		if (!IsValidPtr(gameState)) 
+		{ 
+			gameState = uWorld->gameState;
+			if (!IsValidPtr(gameState)) { continue; }
+		}
 
 		localPlayer = GetPlayer(gameState, 0);
 		if (!IsValidPlayer(localPlayer)) { continue; }
@@ -119,6 +125,11 @@ DWORD WINAPI Thread(LPVOID param)
 				parryTimer = 0;
 
 				if (IsValidPtr(localPlayer->rightHandEquipment)) { localPlayer->rightHandEquipment->canAttack = false; }
+
+				if (IsValidPtr(parrybotTargetPlayer->rightHandEquipment)) 
+				{
+					parryDelay = parrybotTargetPlayer->rightHandEquipment->isTwoHanded ? twoHandParryDelay : oneHandParryDelay;
+				}
 			}
 		}
 		else { shouldParry = false; }
@@ -249,7 +260,7 @@ void Aimbot(AMordhauCharacter* localPlayer, AMordhauCharacter* targetPlayer)
 	else { targetPitch -= 180; }
 
 	float directPitch = -(asin(diff.z / distance) * rToD) - 6;
-	if (directPitch < -45 || directPitch > 60) { targetPitch = directPitch; }
+	if (directPitch < -60 || directPitch > 60) { targetPitch = directPitch; }
 
 	if (targetPitch > 90 || targetPitch < -90) { return; }
 
@@ -294,7 +305,7 @@ float GetProjectileVelocity(AMordhauCharacter* localPlayer)
 		}
 	}
 
-	return 250; // any other small throwable weapon
+	return 225; // any other small throwable weapon
 }
 
 void MoveYaw(float deltaYaw, float speed)
@@ -416,13 +427,17 @@ bool InitFunctions(uintptr_t mordhauBaseAddress)
 	if (getVelocityAddress == 0) { return false; }
 	GetVelocity = (GetVelocityType)getVelocityAddress;
 
-	uintptr_t getPawnViewLocationAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x83\xEC\x28\x48\x8B\x81\x30\x01\x00\x00\xF3", 12, 0xCC);
+	uintptr_t getPawnViewLocationAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x83\xEC\x18\x48\x8B\x81\x30\x01\x00\x00\xF3", 12, 0xCC);
 	if (getPawnViewLocationAddress == 0) { return false; }
 	GetPawnViewLocation = (GetPawnViewLocationType)getPawnViewLocationAddress;
 
 	uintptr_t isPlayerControlledType = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x75\x03\xB0\x01\xC3\x32\xC0\xC3", 27, 0xCC);
 	if (isPlayerControlledType == 0) { return false; }
 	IsPlayerControlled = (IsPlayerControlledType)isPlayerControlledType;
+
+	uintptr_t isBotControlledType = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x74\x03\xB0\x01\xC3", 24, 0xCC);
+	if (isBotControlledType == 0) { return false; }
+	IsBotControlled = (IsBotControlledType)isBotControlledType;
 
 	return true;
 }
@@ -441,12 +456,12 @@ bool PatchIsBanned(uintptr_t mordhauBaseAddress)
 
 bool IsValidPtr(void* ptr) 
 { 
-	return (uintptr_t)ptr > 0x1000000000 && (uintptr_t)ptr < 0x7FFFFFFFFFFF;
+	return !IsBadReadPtr(ptr, sizeof(ptr));
 }
 
 bool IsValidPlayer(AMordhauCharacter* player)
 {
-	return IsValidPtr(player) && IsPlayerControlled(player) && !player->isDead;
+	return IsValidPtr(player) && (IsPlayerControlled(player) || IsBotControlled(player)) && !player->isDead;
 }
 
 void SendRightClick() 

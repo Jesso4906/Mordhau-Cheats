@@ -2,8 +2,8 @@
 #include "mathStructs.h"
 
 // these are offset from Mordhau-Win64-Shipping.exe
-const unsigned int uEngineOffset = 0x58FC430;
-const unsigned int uWorldOffset = 0x58FFE00;
+const unsigned int uEngineOffset = 0x591CB70;
+const unsigned int uWorldOffset = 0x59200F8;
 
 const unsigned int isInitOffset = 0xA38;
 struct UEngine 
@@ -38,13 +38,17 @@ struct FText
 };
 
 const unsigned int equipmentNameOffset = 0x550;
+const unsigned int isTwoHandedOffset = 0x56B;
 const unsigned int canAttackOffset = 0xCB9;
 struct AMordhauEquipment 
 {
 	char pad1[equipmentNameOffset];
 	FText* equipmentName;
 
-	char pad2[canAttackOffset - equipmentNameOffset - sizeof(equipmentName)];
+	char pad2[isTwoHandedOffset - equipmentNameOffset - sizeof(equipmentName)];
+	bool isTwoHanded;
+
+	char pad3[canAttackOffset - isTwoHandedOffset - sizeof(isTwoHanded)];
 	bool canAttack;
 };
 
@@ -110,3 +114,6 @@ GetPawnViewLocationType GetPawnViewLocation;
 
 typedef bool (__fastcall* IsPlayerControlledType)(AMordhauCharacter* aPawn); // APawn::IsPlayerControlled
 IsPlayerControlledType IsPlayerControlled;
+
+typedef bool(__fastcall* IsBotControlledType)(AMordhauCharacter* aPawn); // APawn::IsBotControlled
+IsBotControlledType IsBotControlled;
