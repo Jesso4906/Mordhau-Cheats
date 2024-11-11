@@ -40,6 +40,8 @@ struct FText
 const unsigned int equipmentNameOffset = 0x550;
 const unsigned int isTwoHandedOffset = 0x56B;
 const unsigned int canAttackOffset = 0xCB9;
+const unsigned int allowCancelDrawOffset = 0xCC7;
+const unsigned int rangedDrawTimeOffset = 0xCEC;
 struct AMordhauEquipment 
 {
 	char pad1[equipmentNameOffset];
@@ -50,6 +52,14 @@ struct AMordhauEquipment
 
 	char pad3[canAttackOffset - isTwoHandedOffset - sizeof(isTwoHanded)];
 	bool canAttack;
+
+	char pad4[allowCancelDrawOffset - canAttackOffset - sizeof(canAttack)];
+	bool allowCancelDraw;
+
+	char pad5[rangedDrawTimeOffset - allowCancelDrawOffset - sizeof(allowCancelDraw)];
+	float rangedDrawTime;
+	float rangedCancelTime;
+	float rangedReleaseTime;
 };
 
 const unsigned int isDeadOffset = 0x504;
@@ -117,3 +127,6 @@ IsPlayerControlledType IsPlayerControlled;
 
 typedef bool(__fastcall* IsBotControlledType)(AMordhauCharacter* aPawn); // APawn::IsBotControlled
 IsBotControlledType IsBotControlled;
+
+typedef void(__fastcall* AddItemType)(void* inventory, int* result, const int itemId); // UMordhauInventory::AddItem
+AddItemType AddItem;

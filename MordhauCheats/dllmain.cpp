@@ -6,17 +6,19 @@ bool targetSameTeam = true;
 bool increaseLookLimit = false;
 bool enableDodge = true;
 bool disableTurnCap = false;
+bool allowCancelDraw = false;
+bool enableInstantThrow = false;
 
 const float g = -9.81;
 
 const int aimbotCooldown = 1000;
 
 const int oneHandParryDelay = 130000;
-const int twoHandParryDelay = 140000;
+const int twoHandParryDelay = 150000;
 const int parryCooldown = 1000000;
 
 const int cheatMenuWidth = 400;
-const int cheatMenuHeight = 190;
+const int cheatMenuHeight = 240;
 
 DWORD WINAPI Thread(LPVOID param)
 {
@@ -75,6 +77,34 @@ DWORD WINAPI Thread(LPVOID param)
 		{
 			localPlayer->turnRateCapTarget = -1;
 			localPlayer->lookUpRateCapTarget = -1;
+		}
+
+		if (allowCancelDraw || enableInstantThrow) 
+		{
+			AMordhauEquipment* targetWeapon = nullptr;
+			if (IsValidPtr(localPlayer->rightHandEquipment)) 
+			{
+				targetWeapon = localPlayer->rightHandEquipment;
+			}
+			else if (IsValidPtr(localPlayer->leftHandEquipment))
+			{
+				targetWeapon = localPlayer->leftHandEquipment;
+			}
+
+			if (targetWeapon != nullptr) 
+			{
+				if (allowCancelDraw)
+				{
+					targetWeapon->allowCancelDraw = true;
+				}
+
+				if(enableInstantThrow)
+				{
+					targetWeapon->rangedDrawTime = 0;
+					targetWeapon->rangedCancelTime = 0;
+					targetWeapon->rangedReleaseTime = 0;
+				}
+			}
 		}
 		
 		if(useAimbot && GetAsyncKeyState(VK_MBUTTON) & 1)
@@ -216,6 +246,8 @@ void Draw() // called in DetourPresent()
 	ImGui::Checkbox("Set look limit to 180 degrees", &increaseLookLimit);
 	ImGui::Checkbox("Disable turn cap", &disableTurnCap);
 	ImGui::Checkbox("Enable dodge", &enableDodge);
+	ImGui::Checkbox("Allow cancel throw weapon", &allowCancelDraw);
+	ImGui::Checkbox("Enable instant throw", &enableInstantThrow);
 
 	ImGui::End();
 }
@@ -293,7 +325,7 @@ float GetProjectileVelocity(AMordhauCharacter* localPlayer)
 		}
 		else if (wcscmp(equipmentName, L"Short Spear") == 0 || wcscmp(equipmentName, L"Javelin") == 0 || wcscmp(equipmentName, L"Partisan") == 0)
 		{
-			return 280;
+			return 300;
 		}
 		else if (wcscmp(equipmentName, L"Throwing Axe") == 0 || wcscmp(equipmentName, L"Throwing Knife") == 0 || wcscmp(equipmentName, L"Rock") == 0)
 		{
@@ -431,13 +463,17 @@ bool InitFunctions(uintptr_t mordhauBaseAddress)
 	if (getPawnViewLocationAddress == 0) { return false; }
 	GetPawnViewLocation = (GetPawnViewLocationType)getPawnViewLocationAddress;
 
-	uintptr_t isPlayerControlledType = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x75\x03\xB0\x01\xC3\x32\xC0\xC3", 27, 0xCC);
-	if (isPlayerControlledType == 0) { return false; }
-	IsPlayerControlled = (IsPlayerControlledType)isPlayerControlledType;
+	uintptr_t isPlayerControlledAdress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x75\x03\xB0\x01\xC3\x32\xC0\xC3", 27, 0xCC);
+	if (isPlayerControlledAdress == 0) { return false; }
+	IsPlayerControlled = (IsPlayerControlledType)isPlayerControlledAdress;
 
-	uintptr_t isBotControlledType = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x74\x03\xB0\x01\xC3", 24, 0xCC);
-	if (isBotControlledType == 0) { return false; }
-	IsBotControlled = (IsBotControlledType)isBotControlledType;
+	uintptr_t isBotControlledAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x8B\x81\x40\x02\x00\x00\x48\x85\xC0\x74\x0C\xF6\x80\x2A\x02\x00\x00\x08\x74\x03\xB0\x01\xC3", 24, 0xCC);
+	if (isBotControlledAddress == 0) { return false; }
+	IsBotControlled = (IsBotControlledType)isBotControlledAddress;
+
+	uintptr_t addItemAddress = FindArrayOfBytes(mordhauBaseAddress, (BYTE*)"\x48\x89\x5C\x24\x08\x57\x48\x83\xEC\x30\x48\x8B\xFA\x48\x8B\xD9\x44\x89", 18, 0xCC);
+	if (addItemAddress == 0) { return false; }
+	AddItem = (AddItemType)addItemAddress;
 
 	return true;
 }
